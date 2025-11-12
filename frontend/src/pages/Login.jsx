@@ -1,10 +1,12 @@
-// src/pages/Login.jsx (or wherever your Login component is)
+// src/pages/Login.jsx
 import { useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -13,81 +15,147 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setMessage("");
+
     try {
       const res = await axios.post("http://localhost:5000/login", form);
 
-      // store user (and token if backend sends one) so Home can access it
-      if (res.data?.user) {
-        localStorage.setItem("user", JSON.stringify(res.data.user));
-      }
-      if (res.data?.token) {
-        localStorage.setItem("token", res.data.token);
-      }
+      if (res.data?.user) localStorage.setItem("user", JSON.stringify(res.data.user));
+      if (res.data?.token) localStorage.setItem("token", res.data.token);
 
-      alert(`Login successful! Welcome ${res.data.user?.firstName || ""}`);
-
-      // navigate to home
+      setMessage("Login successful!");
+      setForm({ email: "", password: "" });
       navigate("/home");
     } catch (err) {
-      alert(err.response?.data?.message || "Login failed with some errors");
+      setMessage(err.response?.data?.message || "Login failed");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 px-4">
-      <div className="w-full max-w-md bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl p-8">
-        <h1 className="text-4xl font-extrabold text-center text-gray-800 mb-6">
-          Welcome Back
-        </h1>
-        <p className="text-center text-gray-500 mb-8">
-          Login to continue your journey 
-        </p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-6">
+      <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* LEFT PROMO PANEL */}
+        <div className="hidden md:flex items-center justify-center">
+          <div className="w-4/5 bg-gradient-to-b from-blue-500 via-blue-400 to-indigo-400 rounded-3xl p-12 shadow-2xl transform -rotate-[1deg]">
+            <div className="flex flex-col items-center text-center text-white">
+              <div className="w-28 h-28 bg-white/20 rounded-2xl flex items-center justify-center mb-6 shadow">
+                <svg
+                  width="70"
+                  height="70"
+                  viewBox="0 0 64 64"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path d="M32 10C36.4183 10 40 13.5817 40 18C40 22.4183 36.4183 26 32 26C27.5817 26 24 22.4183 24 18C24 13.5817 27.5817 10 32 10Z" fill="white" fillOpacity="0.95"/>
+                  <path d="M22 34C18.6863 34 16 36.6863 16 40V44H48V40C48 36.6863 45.3137 34 42 34H22Z" fill="white" fillOpacity="0.95"/>
+                </svg>
+              </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-gray-700 text-sm font-semibold mb-2">
-              Email Address
-            </label>
-            <input
-              type="email"
-              name="email"
-              placeholder="Enter your email"
-              value={form.email}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-purple-300 focus:border-purple-500 transition duration-300"
-            />
+              <h2 className="text-3xl font-extrabold tracking-tight mb-3">
+                HEALTHCARE
+              </h2>
+
+              <p className="text-sm max-w-xs">
+                All your healthcare needs <br /> on your fingertips
+              </p>
+
+              <div className="mt-8 w-full">
+                <div className="h-3 bg-white/10 rounded-full mb-3" />
+                <div className="h-3 bg-white/10 rounded-full w-5/6" />
+              </div>
+            </div>
           </div>
+        </div>
 
-          <div>
-            <label className="block text-gray-700 text-sm font-semibold mb-2">
-              Password
-            </label>
-            <input
-              type="password"
-              name="password"
-              placeholder="Enter your password"
-              value={form.password}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-4 focus:ring-pink-300 focus:border-pink-500 transition duration-300"
-            />
+        {/* RIGHT LOGIN PANEL */}
+        <div className="flex items-center justify-center">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8">
+            <div className="mb-6 text-center">
+              <div className="inline-flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center">
+                  <svg
+                    width="34"
+                    height="34"
+                    viewBox="0 0 64 64"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M32 12C35.866 12 39 15.134 39 19C39 22.866 35.866 26 32 26C28.134 26 25 22.866 25 19C25 15.134 28.134 12 32 12Z" fill="white"/>
+                    <path d="M24 34C21.7909 34 20 35.7909 20 38V42H44V38C44 35.7909 42.2091 34 40 34H24Z" fill="white"/>
+                  </svg>
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-800">Login</h1>
+                  <p className="text-sm text-gray-500">Sign in to your account</p>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">
+                  EMAIL
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="Email"
+                  value={form.email}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">
+                  PASSWORD
+                </label>
+                <input
+                  type="password"
+                  name="password"
+                  placeholder="Password"
+                  value={form.password}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className={`w-full mt-2 py-3 rounded-lg bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-semibold shadow-md transition ${
+                  loading ? "opacity-70 cursor-not-allowed" : "hover:brightness-105"
+                }`}
+              >
+                {loading ? "Logging in..." : "Login"}
+              </button>
+            </form>
+
+            {message && (
+              <div
+                className={`mt-5 text-sm rounded-md px-4 py-3 text-center ${
+                  message.toLowerCase().includes("successful")
+                    ? "bg-green-50 text-green-700 border border-green-100"
+                    : "bg-red-50 text-red-700 border border-red-100"
+                }`}
+              >
+                {message}
+              </div>
+            )}
+
+            <div className="mt-6 text-center text-sm text-gray-500">
+              Don’t have an account?{" "}
+              <a href="/register" className="text-indigo-600 font-medium hover:underline">
+                Sign up
+              </a>
+            </div>
           </div>
-
-          <button
-            type="submit"
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-500 text-white py-3 rounded-xl font-semibold shadow-md hover:shadow-xl hover:scale-[1.02] transition-transform duration-300"
-          >
-            Login
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-gray-600">
-          Don’t have an account?{" "}
-          <a href="/register" className="text-purple-600 font-semibold hover:underline">
-            Sign up
-          </a>
-        </p>
+        </div>
       </div>
     </div>
   );

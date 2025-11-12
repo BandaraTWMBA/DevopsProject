@@ -36,7 +36,7 @@ services:
 
   mongo:
     image: mongo:6
-    container_name: mongo-db
+    container_name: health-db
     ports:
       - "27017:27017"
     environment:

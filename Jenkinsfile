@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = 'dockerhub'                  // Jenkins credentials ID (username/password or token)
+        DOCKERHUB_CREDENTIALS = 'BandaraTWMBA'                  // Jenkins credentials ID (username/password or token)
         DOCKERHUB_USERNAME = 'BudhathriBandara'              // <-- replace with your Docker Hub username
         // IMAGE_TAG will be computed in a shell step because sh() returns stdout in a pipeline step
     }

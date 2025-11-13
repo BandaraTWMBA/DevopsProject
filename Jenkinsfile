@@ -3,7 +3,7 @@ pipeline {
 
   environment {
     // Replace with the Jenkins credential ID that contains your Docker Hub username+password/token
-    DOCKERHUB_CREDENTIALS = 'BandaraTWMBA'  
+    DOCKERHUB_CREDENTIALS = 'github_pat'  
     DOCKERHUB_USERNAME = 'budhathribandara'
     CI_COMPOSE_FILE = 'docker-compose.ci.yml' // change if your CI compose file has a different name/path
   }

@@ -16,11 +16,9 @@ pipeline {
 
         stage('Build Docker Images with Compose') {
             steps {
-                sh '''#!/bin/bash
-                set -eu
-                echo "Building images from docker-compose.yml..."
-                docker compose -f docker-compose.yml build --parallel
-                '''
+                script {
+                    sh "docker-compose build"
+                }
             }
         }
 

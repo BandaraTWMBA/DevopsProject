@@ -7,7 +7,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: health_backend_ci
+    container_name: health_backend
     ports:
       - "5000:5000"
     environment:
@@ -23,7 +23,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: health_frontend_ci
+    container_name: health_frontend
     ports:
       - "5173:5173"
     environment:

@@ -41,7 +41,7 @@ pipeline {
         stage('Push Images to Docker Hub') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub') {
+                    docker.withRegistry('https://index.docker.io/v1/', DOCKERHUB_CREDENTIALS) {
                         sh """
                         docker push ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG}
                         docker push ${DOCKERHUB_USERNAME}/health-backend:latest

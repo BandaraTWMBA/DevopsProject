@@ -31,6 +31,9 @@ pipeline {
                     docker tag health_backend ${DOCKERHUB_USERNAME}/health-backend:latest
                     docker tag health_frontend ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}
                     docker tag health_frontend ${DOCKERHUB_USERNAME}/health-frontend:latest
+                    docker pull mongo:6
+                    docker tag mongo:6 ${DOCKERHUB_USERNAME}/health-mongo:${IMAGE_TAG}
+                    docker tag mongo:6 ${DOCKERHUB_USERNAME}/health-mongo:latest
                     """
                 }
             }
@@ -50,17 +53,17 @@ pipeline {
                 }
             }
         }
-        stage('Run Containers') {
-            steps {
-          script {
-              sh '''
-              echo "Starting containers using docker-compose..."
-              docker-compose -f docker-compose.yml up -d
-              docker ps
-              '''
-          }
-            }
-        }
+        // stage('Run Containers') {
+        //     steps {
+        //   script {
+        //       sh '''
+        //       echo "Starting containers using docker-compose..."
+        //       docker-compose -f docker-compose.yml up -d
+        //       docker ps
+        //       '''
+        //   }
+        //     }
+        // }
     }
 
     post {

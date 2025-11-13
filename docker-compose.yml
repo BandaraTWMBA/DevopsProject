@@ -1,9 +1,7 @@
-#docker-compose.yml
-version: "3.8"
 
 services:
   backend:
-    image: health_backend                # local image name used during build
+    image: health_backend          # <-- explicitly name the image
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -15,11 +13,13 @@ services:
       - MONGODB_URI=mongodb://mongo:27017/devops_db
     depends_on:
       - mongo
-    # NOTE: removed host volume mounts for CI builds
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
     restart: unless-stopped
 
   frontend:
-    image: health_frontend               # local image name used during build
+    image: health_frontend         # <-- explicitly name the image
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -30,16 +30,18 @@ services:
       - VITE_API_URL=http://localhost:5000
     depends_on:
       - backend
-    # NOTE: removed host volume mounts for CI builds
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     restart: unless-stopped
 
   mongo:
     image: mongo:6
-    container_name: health-db-ci
+    container_name: mongo-db
     ports:
       - "27017:27017"
     environment:
-      - MONGO_INITDB_DATABASE=auth_db
+      - MONGO_INITDB_DATABASE=devops_db
     volumes:
       - mongo_data:/data/db
     restart: unless-stopped

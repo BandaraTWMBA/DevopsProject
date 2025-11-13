@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = 'gitub_pat'                  // Jenkins credentials ID
+        DOCKERHUB_CREDENTIALS = 'github_pat'                  // Jenkins credentials ID
         DOCKERHUB_USERNAME = 'budhathribandara'             // Docker Hub username
         IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
     }

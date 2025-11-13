@@ -59,12 +59,12 @@ pipeline {
         set -euo pipefail
 
         echo "Tagging backend image..."
-        docker tag health_backend:latest ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG}
-        docker tag health_backend:latest ${DOCKERHUB_USERNAME}/health-backend:latest
+        docker tag health_backend:latest ${DOCKERHUB_USERNAME}/health_backend:${IMAGE_TAG}
+        docker tag health_backend:latest ${DOCKERHUB_USERNAME}/health_backend:latest
 
         echo "Tagging frontend image..."
-        docker tag health_frontend:latest ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}
-        docker tag health_frontend:latest ${DOCKERHUB_USERNAME}/health-frontend:latest
+        docker tag health_frontend:latest ${DOCKERHUB_USERNAME}/health_frontend:${IMAGE_TAG}
+        docker tag health_frontend:latest ${DOCKERHUB_USERNAME}/health_frontend:latest
 
         echo "✅ Tagging complete."
       """
@@ -83,12 +83,12 @@ pipeline {
               echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
 
               echo "Pushing backend images..."
-              docker push ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG} || true
-              docker push ${DOCKERHUB_USERNAME}/health-backend:latest || true
+              docker push ${DOCKERHUB_USERNAME}/healthbackend:${IMAGE_TAG} || true
+              docker push ${DOCKERHUB_USERNAME}/health_backend:latest || true
 
               echo "Pushing frontend images..."
-              docker push ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG} || true
-              docker push ${DOCKERHUB_USERNAME}/health-frontend:latest || true
+              docker push ${DOCKERHUB_USERNAME}/health_frontend:${IMAGE_TAG} || true
+              docker push ${DOCKERHUB_USERNAME}/health_frontend:latest || true
 
               docker logout || true
             """

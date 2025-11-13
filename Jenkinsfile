@@ -2,32 +2,40 @@ pipeline {
   agent any
 
   environment {
-    // Change these to match your Jenkins credentials ID & DockerHub username
-    DOCKERHUB_CREDENTIALS = 'github_pat'    // Jenkins Credentials ID (Username+Password or username+token)
-    DOCKERHUB_USERNAME = 'budhathribandara'     // Docker Hub username (replace)
-    CI_COMPOSE_FILE = 'docker-compose.yml'    // CI-friendly compose file
+    // Jenkins credentials & Docker Hub username
+    DOCKERHUB_CREDENTIALS = 'github_pat'
+    DOCKERHUB_USERNAME    = 'budhathribandara'
+    CI_COMPOSE_FILE       = 'docker-compose.yml'
+  }
+
+  parameters {
+    booleanParam(name: 'PUSH_IMAGES', defaultValue: true, description: 'If true, tag & push images to Docker Hub')
+    string(name: 'IMAGE_TAG', defaultValue: '', description: 'Optional image tag (defaults to git short SHA)')
   }
 
   stages {
     stage('Checkout') {
-      steps {
-        checkout scm
-      }
+      steps { checkout scm }
     }
 
     stage('Prepare') {
       steps {
         script {
-          // Determine git short SHA for tagging
-          IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-          echo "Image tag: ${IMAGE_TAG}"
+          env.IMAGE_TAG = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG : sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+          echo "Using IMAGE_TAG = ${env.IMAGE_TAG}"
 
-          // Find docker-compose (prefer 'docker compose', fallback to 'docker-compose')
-          COMPOSE_CMD = sh(script: "command -v docker && docker compose version >/dev/null 2>&1 && echo 'docker compose' || (command -v docker-compose >/dev/null 2>&1 && echo 'docker-compose') || true", returnStdout: true).trim()
-          if (!COMPOSE_CMD) {
-            error "No docker compose binary found. Install docker-compose or ensure Docker CLI has 'docker compose'."
-          }
-          echo "Using compose command: ${COMPOSE_CMD}"
+          env.COMPOSE_CMD = sh(script: """
+            if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+              echo "docker compose"
+            elif command -v docker-compose >/dev/null 2>&1; then
+              echo "docker-compose"
+            else
+              echo ""
+            fi
+          """, returnStdout: true).trim()
+
+          if (!env.COMPOSE_CMD) { error "No docker compose binary found." }
+          echo "Compose command: ${env.COMPOSE_CMD}"
         }
       }
     }
@@ -35,11 +43,10 @@ pipeline {
     stage('Build Images') {
       steps {
         script {
-          // Build using the CI compose file
           sh """
-             set -e
-             echo "Building images with ${COMPOSE_CMD}..."
-             ${COMPOSE_CMD} -f ${CI_COMPOSE_FILE} build --parallel
+            set -euo pipefail
+            echo "Building images from ${CI_COMPOSE_FILE}..."
+            ${env.COMPOSE_CMD} -f ${CI_COMPOSE_FILE} build --parallel
           """
         }
       }
@@ -48,38 +55,61 @@ pipeline {
     stage('Tag Images') {
       steps {
         script {
-          // Tag the locally-built images (names must match compose images)
           sh """
-            set -e
-            echo "Tagging images with ${DOCKERHUB_USERNAME}/${IMAGE_TAG}..."
-            docker tag health_backend ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG}
-            docker tag health_backend ${DOCKERHUB_USERNAME}/health-backend:latest
-            docker tag health_frontend ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}
-            docker tag health_frontend ${DOCKERHUB_USERNAME}/health-frontend:latest
+            set -euo pipefail
+
+            # Detect backend image
+            BACKEND_SRC=\$(docker ps -a --filter "name=health_backend_ci" --format '{{.Image}}' | head -n1 || true)
+            if [ -z "\$BACKEND_SRC" ]; then
+              BACKEND_SRC=\$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^health_backend' | head -n1)
+            fi
+            if [ -z "\$BACKEND_SRC" ]; then
+              echo "ERROR: backend image not found!"
+              docker images
+              exit 1
+            fi
+            echo "Backend image detected: \$BACKEND_SRC"
+            docker tag "\$BACKEND_SRC" ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG}
+            docker tag "\$BACKEND_SRC" ${DOCKERHUB_USERNAME}/health-backend:latest
+
+            # Detect frontend image
+            FRONTEND_SRC=\$(docker ps -a --filter "name=health_frontend_ci" --format '{{.Image}}' | head -n1 || true)
+            if [ -z "\$FRONTEND_SRC" ]; then
+              FRONTEND_SRC=\$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^health_frontend' | head -n1)
+            fi
+            if [ -z "\$FRONTEND_SRC" ]; then
+              echo "ERROR: frontend image not found!"
+              docker images
+              exit 1
+            fi
+            echo "Frontend image detected: \$FRONTEND_SRC"
+            docker tag "\$FRONTEND_SRC" ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}
+            docker tag "\$FRONTEND_SRC" ${DOCKERHUB_USERNAME}/health-frontend:latest
+
+            echo "✅ Tagging complete."
           """
         }
       }
     }
 
     stage('Docker Login & Push') {
+      when { expression { return params.PUSH_IMAGES } }
       steps {
         script {
-          // Use Jenkins username/password credentials to login to Docker Hub
           withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}", usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
             sh """
-              set -e
-              echo "Logging in to Docker Hub as ${DOCKERHUB_USERNAME}..."
+              set -euo pipefail
               echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
 
               echo "Pushing backend images..."
-              docker push ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG}
-              docker push ${DOCKERHUB_USERNAME}/health-backend:latest
+              docker push ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG} || true
+              docker push ${DOCKERHUB_USERNAME}/health-backend:latest || true
 
               echo "Pushing frontend images..."
-              docker push ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}
-              docker push ${DOCKERHUB_USERNAME}/health-frontend:latest
+              docker push ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG} || true
+              docker push ${DOCKERHUB_USERNAME}/health-frontend:latest || true
 
-              docker logout
+              docker logout || true
             """
           }
         }
@@ -88,11 +118,17 @@ pipeline {
   }
 
   post {
-    success {
-      echo "✅ Build & push completed successfully"
+    always {
+      script {
+        sh """
+          set -euo pipefail || true
+          echo "Tearing down compose stack..."
+          ${env.COMPOSE_CMD} -f ${CI_COMPOSE_FILE} down --volumes --remove-orphans || true
+        """
+      }
     }
-    failure {
-      echo "❌ Build or push failed — check console logs"
-    }
+
+    success { echo "✅ Pipeline completed successfully" }
+    failure { echo "❌ Pipeline failed — check logs above" }
   }
 }

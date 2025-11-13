@@ -1,145 +1,118 @@
-// pipeline {
-//   agent any
-
-//   environment {
-//     DOCKERHUB_CREDENTIALS = 'github_pat'
-//     DOCKERHUB_USERNAME = 'budhathribandara'
-//     CI_COMPOSE_FILE = 'docker-compose.ci.yml'   
-//   }
-
-//   stages {
-//     stage('Checkout') {
-//       steps {
-//         checkout scm
-//       }
-//     }
-
-//     stage('Debug workspace') {
-//       steps {
-//         sh '''
-//           echo "WORKSPACE: $WORKSPACE"
-//           pwd
-//           ls -la
-//           echo "Show the compose file (if present):"
-//           if [ -f "$CI_COMPOSE_FILE" ]; then echo "FOUND $CI_COMPOSE_FILE"; else echo "MISSING $CI_COMPOSE_FILE"; fi
-//         '''
-//       }
-//     }
-
-//     stage('Prepare') {
-//       steps {
-//         script {
-//           IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-//           echo "Image tag: ${IMAGE_TAG}"
-
-//           // Pick compose command: prefer "docker compose" builtin, fallback to docker-compose
-//           COMPOSE_CMD = sh(script: "if docker compose version >/dev/null 2>&1; then echo 'docker compose'; elif command -v docker-compose >/dev/null 2>&1; then echo 'docker-compose'; else echo ''; fi", returnStdout: true).trim()
-//           if (!COMPOSE_CMD) {
-//             error "No docker compose available. Install docker-compose or ensure Docker CLI supports 'docker compose'."
-//           }
-//           echo "Using compose command: ${COMPOSE_CMD}"
-//         }
-//       }
-//     }
-
-//     stage('Check compose file') {
-//       steps {
-//         script {
-//           if (!fileExists("${CI_COMPOSE_FILE}")) {
-//             error "Compose file '${CI_COMPOSE_FILE}' not found in workspace. Make sure it is committed or update CI_COMPOSE_FILE to the correct path."
-//           }
-//         }
-//       }
-//     }
-
-//     stage('Build Images') {
-//       steps {
-//         script {
-//           sh """
-//             set -e
-//             echo "Building images with ${COMPOSE_CMD} -f ${CI_COMPOSE_FILE}..."
-//             ${COMPOSE_CMD} -f ${CI_COMPOSE_FILE} build --parallel
-//           """
-//         }
-//       }
-//     }
-
-//     // ... remaining Tag/Push stages unchanged ...
-//   }
-
-//   post {
-//     success { echo "✅ Build & push completed successfully" }
-//     failure { echo "❌ Build or push failed — check console logs" }
-//   }
-// }
-
-
-
-
-
-
-
-
 pipeline {
-    agent any
+  agent any
 
-    environment {
-        DOCKERHUB_CREDENTIALS = 'github_pat'                  // Jenkins credentials ID
-        DOCKERHUB_USERNAME = 'budhathribandara'             // Docker Hub username
-        IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+  environment {
+    // Replace with the Jenkins credential ID that contains your Docker Hub username+password/token
+    DOCKERHUB_CREDENTIALS = 'BandaraTWMBA'  
+    DOCKERHUB_USERNAME = 'budhathribandara'
+    CI_COMPOSE_FILE = 'docker-compose.ci.yml' // change if your CI compose file has a different name/path
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
     }
 
-    stages {
-        stage('Checkout Code') {
-            steps {
-                checkout scm
-            }
-        }
+    stage('Set image tag & detect compose') {
+      steps {
+        script {
+          // compute IMAGE_TAG at runtime
+          IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+          echo "IMAGE_TAG -> ${IMAGE_TAG}"
 
-        stage('Build Docker Images with Compose') {
-            steps {
-                script {
-                    sh "docker-compose build"
-                }
-            }
-        }
+          // choose compose command available on the agent
+          COMPOSE_CMD = sh(script: """
+            if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+              echo "docker compose"
+            elif command -v docker-compose >/dev/null 2>&1; then
+              echo "docker-compose"
+            else
+              echo ""
+            fi
+          """, returnStdout: true).trim()
 
-        stage('Tag Images for Docker Hub') {
-            steps {
-                script {
-                    // Tag backend and frontend images
-                    sh """
-                    docker tag health_backend_ci ${DOCKERHUB_USERNAME}/health_backend_ci:${IMAGE_TAG}
-                    docker tag health_backend_ci ${DOCKERHUB_USERNAME}/health_backend_ci:latest
-                    docker tag health_frontend_ci ${DOCKERHUB_USERNAME}/health_frontend_ci:${IMAGE_TAG}
-                    docker tag health_frontend_ci ${DOCKERHUB_USERNAME}/health_frontend_ci:latest
-                    """
-                }
-            }
+          if (!COMPOSE_CMD) {
+            error "No docker compose binary found on agent (neither 'docker compose' nor 'docker-compose')."
+          }
+          echo "Using compose command: ${COMPOSE_CMD}"
         }
-
-        stage('Push to Docker Hub') {
-            steps {
-                script {
-                    docker.withRegistry('https://index.docker.io/v1/', DOCKERHUB_CREDENTIALS) {
-                        sh """
-                        docker push ${DOCKERHUB_USERNAME}/health_backend_ci:${IMAGE_TAG}
-                        docker push ${DOCKERHUB_USERNAME}/health_backend_ci:latest
-                        docker push ${DOCKERHUB_USERNAME}/health_frontend_ci:${IMAGE_TAG}
-                        docker push ${DOCKERHUB_USERNAME}/health_frontend_ci:latest
-                        """
-                    }
-                }
-            }
-        }
+      }
     }
 
-    post {
-        success {
-            echo "✅ Successfully built and pushed both backend and frontend images!"
+    stage('Build images') {
+      steps {
+        script {
+          // build using the chosen compose and the CI compose file
+          sh """
+            set -e
+            echo "PWD: \$(pwd)"
+            ${COMPOSE_CMD} -f ${CI_COMPOSE_FILE} build --parallel
+          """
         }
-        failure {
-            echo "❌ Build or push failed. Check Jenkins logs for details."
-        }
+      }
     }
+
+    stage('Show local images (debug)') {
+      steps {
+        sh '''
+          echo "=== Local images after build ==="
+          docker images --format "table {{.Repository}}\\t{{.Tag}}\\t{{.ID}}"
+        '''
+      }
+    }
+
+    stage('Tag images for Docker Hub') {
+      steps {
+        script {
+          // Tag the images that are actually built by your compose file.
+          // Replace these source image names if your compose defines different image names.
+          sh """
+            set -e
+            echo "Tagging images..."
+            # These source names must match the 'image:' names in your docker-compose.yml or what was produced by build
+            docker tag health_backend ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG} || true
+            docker tag health_backend ${DOCKERHUB_USERNAME}/health-backend:latest || true
+            docker tag health_frontend ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG} || true
+            docker tag health_frontend ${DOCKERHUB_USERNAME}/health-frontend:latest || true
+
+            echo "Images after tagging:"
+            docker images --format "table {{.Repository}}\\t{{.Tag}}\\t{{.ID}}"
+          """
+        }
+      }
+    }
+
+    stage('Push to Docker Hub') {
+      steps {
+        script {
+          // Use docker.withRegistry; ensure DOCKERHUB_CREDENTIALS is a Docker Hub username+password or token credential
+          docker.withRegistry('https://index.docker.io/v1/', DOCKERHUB_CREDENTIALS) {
+            sh """
+              set -e
+              echo "Pushing ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG}"
+              docker push ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG}
+              echo "Pushing ${DOCKERHUB_USERNAME}/health-backend:latest"
+              docker push ${DOCKERHUB_USERNAME}/health-backend:latest || true
+
+              echo "Pushing ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}"
+              docker push ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}
+              echo "Pushing ${DOCKERHUB_USERNAME}/health-frontend:latest"
+              docker push ${DOCKERHUB_USERNAME}/health-frontend:latest || true
+            """
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "✅ Build & push completed. Check Docker Hub ${DOCKERHUB_USERNAME} for repos 'health-backend' and 'health-frontend'."
+    }
+    failure {
+      echo "❌ Pipeline failed — inspect console output for errors."
+    }
+  }
 }

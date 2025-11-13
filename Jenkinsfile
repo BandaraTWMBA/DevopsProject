@@ -5,7 +5,7 @@ pipeline {
     // Change these to match your Jenkins credentials ID & DockerHub username
     DOCKERHUB_CREDENTIALS = 'github_pat'    // Jenkins Credentials ID (Username+Password or username+token)
     DOCKERHUB_USERNAME = 'budhathribandara'     // Docker Hub username (replace)
-    CI_COMPOSE_FILE = 'docker-compose.ci.yml'    // CI-friendly compose file
+    CI_COMPOSE_FILE = 'docker-compose.yml'    // CI-friendly compose file
   }
 
   stages {

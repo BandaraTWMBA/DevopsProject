@@ -21,9 +21,11 @@ pipeline {
     stage('Prepare') {
       steps {
         script {
+          // Use provided IMAGE_TAG or fallback to git short SHA
           env.IMAGE_TAG = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG : sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
           echo "Using IMAGE_TAG = ${env.IMAGE_TAG}"
 
+          // Detect docker-compose command
           env.COMPOSE_CMD = sh(script: """
             if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
               echo "docker compose"
@@ -53,25 +55,24 @@ pipeline {
     }
 
     stage('Tag Images') {
-  steps {
-    script {
-      sh """
-        set -euo pipefail
+      steps {
+        script {
+          sh """
+            set -euo pipefail
 
-        echo "Tagging backend image..."
-        docker tag health_backend:latest ${DOCKERHUB_USERNAME}/health_backend:${IMAGE_TAG}
-        docker tag health_backend:latest ${DOCKERHUB_USERNAME}/health_backend:latest
+            echo "Tagging backend image..."
+            docker tag health_backend:latest ${DOCKERHUB_USERNAME}/health_backend:${IMAGE_TAG}
+            docker tag health_backend:latest ${DOCKERHUB_USERNAME}/health_backend:latest
 
-        echo "Tagging frontend image..."
-        docker tag health_frontend:latest ${DOCKERHUB_USERNAME}/health_frontend:${IMAGE_TAG}
-        docker tag health_frontend:latest ${DOCKERHUB_USERNAME}/health_frontend:latest
+            echo "Tagging frontend image..."
+            docker tag health_frontend:latest ${DOCKERHUB_USERNAME}/health_frontend:${IMAGE_TAG}
+            docker tag health_frontend:latest ${DOCKERHUB_USERNAME}/health_frontend:latest
 
-        echo "✅ Tagging complete."
-      """
+            echo "✅ Tagging complete."
+          """
+        }
+      }
     }
-  }
-}
-
 
     stage('Docker Login & Push') {
       when { expression { return params.PUSH_IMAGES } }
@@ -80,10 +81,11 @@ pipeline {
           withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}", usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
             sh """
               set -euo pipefail
+
               echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
 
               echo "Pushing backend images..."
-              docker push ${DOCKERHUB_USERNAME}/healthbackend:${IMAGE_TAG} || true
+              docker push ${DOCKERHUB_USERNAME}/health_backend:${IMAGE_TAG} || true
               docker push ${DOCKERHUB_USERNAME}/health_backend:latest || true
 
               echo "Pushing frontend images..."

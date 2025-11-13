@@ -50,6 +50,15 @@ pipeline {
                 }
             }
         }
+        stage('Run Containers') {
+            steps {
+                sh '''#!/bin/bash
+                echo "Starting containers using docker-compose..."
+                docker compose -f docker-compose.yml up -d
+                docker ps
+                '''
+            }
+        }
     }
 
     post {

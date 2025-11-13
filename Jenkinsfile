@@ -53,44 +53,25 @@ pipeline {
     }
 
     stage('Tag Images') {
-      steps {
-        script {
-          sh """
-            set -euo pipefail
+  steps {
+    script {
+      sh """
+        set -euo pipefail
 
-            # Detect backend image
-            BACKEND_SRC=\$(docker ps -a --filter "name=health_backend_ci" --format '{{.Image}}' | head -n1 || true)
-            if [ -z "\$BACKEND_SRC" ]; then
-              BACKEND_SRC=\$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^health_backend' | head -n1)
-            fi
-            if [ -z "\$BACKEND_SRC" ]; then
-              echo "ERROR: backend image not found!"
-              docker images
-              exit 1
-            fi
-            echo "Backend image detected: \$BACKEND_SRC"
-            docker tag "\$BACKEND_SRC" ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG}
-            docker tag "\$BACKEND_SRC" ${DOCKERHUB_USERNAME}/health-backend:latest
+        echo "Tagging backend image..."
+        docker tag health_backend:latest ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG}
+        docker tag health_backend:latest ${DOCKERHUB_USERNAME}/health-backend:latest
 
-            # Detect frontend image
-            FRONTEND_SRC=\$(docker ps -a --filter "name=health_frontend_ci" --format '{{.Image}}' | head -n1 || true)
-            if [ -z "\$FRONTEND_SRC" ]; then
-              FRONTEND_SRC=\$(docker images --format '{{.Repository}}:{{.Tag}}' | grep '^health_frontend' | head -n1)
-            fi
-            if [ -z "\$FRONTEND_SRC" ]; then
-              echo "ERROR: frontend image not found!"
-              docker images
-              exit 1
-            fi
-            echo "Frontend image detected: \$FRONTEND_SRC"
-            docker tag "\$FRONTEND_SRC" ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}
-            docker tag "\$FRONTEND_SRC" ${DOCKERHUB_USERNAME}/health-frontend:latest
+        echo "Tagging frontend image..."
+        docker tag health_frontend:latest ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}
+        docker tag health_frontend:latest ${DOCKERHUB_USERNAME}/health-frontend:latest
 
-            echo "✅ Tagging complete."
-          """
-        }
-      }
+        echo "✅ Tagging complete."
+      """
     }
+  }
+}
+
 
     stage('Docker Login & Push') {
       when { expression { return params.PUSH_IMAGES } }

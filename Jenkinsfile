@@ -4,7 +4,7 @@ pipeline {
   environment {
     DOCKERHUB_CREDENTIALS = 'BandaraTWMBA'
     DOCKERHUB_USERNAME = 'budhathribandara'
-    CI_COMPOSE_FILE = 'docker-compose.yml'   // <<-- point to the actual file
+    CI_COMPOSE_FILE = 'docker-compose.ci.yml'   // <<-- point to the actual file
   }
 
   stages {

@@ -9,10 +9,26 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1"  # Change this if you are not in US East 1
+  region = "us-east-1" 
 }
 
-# 1. Create a Security Group (The Firewall)
+# --- NEW: AUTO-SEARCH FOR UBUNTU AMI ---
+# This block asks AWS: "What is the latest ID for Ubuntu 22.04?"
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical (The company that makes Ubuntu)
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
 resource "aws_security_group" "web_sg" {
   name        = "devops-project-sg"
   description = "Allow HTTP, Backend, and SSH traffic"
@@ -21,21 +37,21 @@ resource "aws_security_group" "web_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # SSH Access
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
     from_port   = 5173
     to_port     = 5173
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Frontend (Vite/React)
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
     from_port   = 5000
     to_port     = 5000
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Backend (Node.js)
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
@@ -46,32 +62,25 @@ resource "aws_security_group" "web_sg" {
   }
 }
 
-# 2. Create the Server (EC2 Instance)
 resource "aws_instance" "app_server" {
-  ami           = "ami-0e2c8ccd4e1ffc3c5" # Ubuntu 22.04 LTS (US-East-1)
-  instance_type = "t3.micro"           
-  key_name      = "my-key-pair"   
+  # --- UPDATED: USE THE FOUND ID ---
+  ami           = data.aws_ami.ubuntu.id 
+  instance_type = "t2.medium"            # Kept as medium for safety
+  key_name      = "my-key-pair"          # Your key name from the logs
 
   vpc_security_group_ids = [aws_security_group.web_sg.id]
 
-  # 3. The Magic Script: This runs automatically when the server turns on
   user_data = <<-EOF
               #!/bin/bash
-              # Update and install Docker
               sudo apt-get update -y
               sudo apt-get install -y docker.io
               sudo systemctl start docker
               sudo systemctl enable docker
-              
-              # Install Docker Compose
               sudo apt-get install -y docker-compose-plugin
 
-              # Create a Project Directory
               mkdir -p /home/ubuntu/app
               cd /home/ubuntu/app
 
-              # Create the Production docker-compose.yml file
-              # We use 'cat' to write this file directly to the server
               cat <<EOT > docker-compose.yml
               services:
                 backend:
@@ -99,7 +108,6 @@ resource "aws_instance" "app_server" {
                   restart: always
               EOT
 
-              # Pull the images from Docker Hub and Start the App
               sudo docker compose up -d
               EOF
 
@@ -108,7 +116,6 @@ resource "aws_instance" "app_server" {
   }
 }
 
-# 4. Output the Public IP so you can see it in Jenkins
 output "public_ip" {
   value = aws_instance.app_server.public_ip
 }

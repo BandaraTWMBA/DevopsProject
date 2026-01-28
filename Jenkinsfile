@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = 'github_pat'                // Jenkins credentials ID
-        DOCKERHUB_USERNAME = 'budhathribandara'             // Docker Hub username
+        DOCKERHUB_CREDENTIALS = 'github_pat'
+        DOCKERHUB_USERNAME = 'budhathribandara'
         IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
     }
 
@@ -14,7 +14,7 @@ pipeline {
             }
         }
 
-        stage('Build Docker Images with Compose') {
+        stage('Build Docker Images') {
             steps {
                 script {
                     sh "docker-compose build"
@@ -22,72 +22,62 @@ pipeline {
             }
         }
 
-        stage('Tag Images for Docker Hub') {
-            steps {
-                script {
-                    // Tag backend and frontend images
-                    sh """
-                    docker tag health_backend ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG}
-                    docker tag health_backend ${DOCKERHUB_USERNAME}/health-backend:latest
-                    docker tag health_frontend ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}
-                    docker tag health_frontend ${DOCKERHUB_USERNAME}/health-frontend:latest
-                    """
-                }
-            }
-        }
-
-        stage('Push Images to Docker Hub') {
+        stage('Tag & Push Images') {
             steps {
                 script {
                     docker.withRegistry('https://index.docker.io/v1/', DOCKERHUB_CREDENTIALS) {
-                        sh """
-                        docker push ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG}
-                        docker push ${DOCKERHUB_USERNAME}/health-backend:latest
-                        docker push ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}
-                        docker push ${DOCKERHUB_USERNAME}/health-frontend:latest
-                        """
+                        // Tag and Push Backend
+                        sh "docker tag health_backend ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG}"
+                        sh "docker tag health_backend ${DOCKERHUB_USERNAME}/health-backend:latest"
+                        sh "docker push ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG}"
+                        sh "docker push ${DOCKERHUB_USERNAME}/health-backend:latest"
+
+                        // Tag and Push Frontend
+                        sh "docker tag health_frontend ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}"
+                        sh "docker tag health_frontend ${DOCKERHUB_USERNAME}/health-frontend:latest"
+                        sh "docker push ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}"
+                        sh "docker push ${DOCKERHUB_USERNAME}/health-frontend:latest"
                     }
                 }
             }
         }
 
-        // --- NEW STAGE START ---
-        stage('Provision Infrastructure') {
+        stage('Deploy to AWS') {
             steps {
-                // This injects the AWS keys (aws-creds) you created as environment variables
                 withCredentials([usernamePassword(credentialsId: 'aws-creds', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    
                     dir('terraform') {
-                        // Initialize Terraform
+                        // 1. Initialize Terraform
                         sh 'terraform init'
-                        
-                        // Create the infrastructure (Auto-approve prevents waiting for input)
+
+                        // 2. FORCE REPLACEMENT: This ensures you get a fresh server with the NEW code every time.
+                        // If we don't do this, Terraform might say "No changes" and keep the old app running.
+                        sh 'terraform taint aws_instance.app_server || true'
+
+                        // 3. Apply Changes (Create Server)
                         sh 'terraform apply -auto-approve'
+                        
+                        // 4. Save the IP address to a file so we can see it
+                        sh 'terraform output -raw public_ip > deploy_ip.txt'
                     }
                 }
             }
         }
-        // --- NEW STAGE END ---
-
-        // stage('Run Containers') {
-        //     steps {
-        //   script {
-        //       sh '''
-        //       echo "Starting containers using docker-compose..."
-        //       docker-compose -f docker-compose.yml up -d
-        //       docker ps
-        //       '''
-        //   }
-        //     }
-        // }
     }
 
     post {
         success {
-            echo "✅ Successfully built and pushed backend and frontend images!"
+            script {
+                // Read the IP address we saved
+                def server_ip = readFile('terraform/deploy_ip.txt').trim()
+                
+                echo "✅ Deployment Successful!"
+                echo "--------------------------------------------------"
+                echo "🌐 YOUR APP IS LIVE AT: http://${server_ip}:5173"
+                echo "--------------------------------------------------"
+            }
         }
         failure {
-            echo "❌ Build or push failed. Check Jenkins logs for details."
+            echo "❌ Deployment Failed. Check the logs above."
         }
     }
 }

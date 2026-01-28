@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Home from "./pages/Home";
+import Welcome from "./pages/Welcome";
 
 // simple protected route that checks localStorage user
 function PrivateRoute({ children }) {
@@ -18,6 +19,11 @@ export default function App() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/welcome" element={
+          <PrivateRoute>
+            <Welcome />
+          </PrivateRoute>
+        } />
         <Route path="/home" element={
           <PrivateRoute>
             <Home />

@@ -26,7 +26,7 @@ export default function Login() {
 
       setMessage("Login successful!");
       setForm({ email: "", password: "" });
-      navigate("/home");
+      navigate("/welcome");
     } catch (err) {
       setMessage(err.response?.data?.message || "Login failed");
     } finally {
@@ -49,8 +49,8 @@ export default function Login() {
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
                 >
-                  <path d="M32 10C36.4183 10 40 13.5817 40 18C40 22.4183 36.4183 26 32 26C27.5817 26 24 22.4183 24 18C24 13.5817 27.5817 10 32 10Z" fill="white" fillOpacity="0.95"/>
-                  <path d="M22 34C18.6863 34 16 36.6863 16 40V44H48V40C48 36.6863 45.3137 34 42 34H22Z" fill="white" fillOpacity="0.95"/>
+                  <path d="M32 10C36.4183 10 40 13.5817 40 18C40 22.4183 36.4183 26 32 26C27.5817 26 24 22.4183 24 18C24 13.5817 27.5817 10 32 10Z" fill="white" fillOpacity="0.95" />
+                  <path d="M22 34C18.6863 34 16 36.6863 16 40V44H48V40C48 36.6863 45.3137 34 42 34H22Z" fill="white" fillOpacity="0.95" />
                 </svg>
               </div>
 
@@ -83,8 +83,8 @@ export default function Login() {
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
                   >
-                    <path d="M32 12C35.866 12 39 15.134 39 19C39 22.866 35.866 26 32 26C28.134 26 25 22.866 25 19C25 15.134 28.134 12 32 12Z" fill="white"/>
-                    <path d="M24 34C21.7909 34 20 35.7909 20 38V42H44V38C44 35.7909 42.2091 34 40 34H24Z" fill="white"/>
+                    <path d="M32 12C35.866 12 39 15.134 39 19C39 22.866 35.866 26 32 26C28.134 26 25 22.866 25 19C25 15.134 28.134 12 32 12Z" fill="white" />
+                    <path d="M24 34C21.7909 34 20 35.7909 20 38V42H44V38C44 35.7909 42.2091 34 40 34H24Z" fill="white" />
                   </svg>
                 </div>
                 <div>
@@ -128,9 +128,8 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className={`w-full mt-2 py-3 rounded-lg bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-semibold shadow-md transition ${
-                  loading ? "opacity-70 cursor-not-allowed" : "hover:brightness-105"
-                }`}
+                className={`w-full mt-2 py-3 rounded-lg bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-semibold shadow-md transition ${loading ? "opacity-70 cursor-not-allowed" : "hover:brightness-105"
+                  }`}
               >
                 {loading ? "Logging in..." : "Login"}
               </button>
@@ -138,11 +137,10 @@ export default function Login() {
 
             {message && (
               <div
-                className={`mt-5 text-sm rounded-md px-4 py-3 text-center ${
-                  message.toLowerCase().includes("successful")
+                className={`mt-5 text-sm rounded-md px-4 py-3 text-center ${message.toLowerCase().includes("successful")
                     ? "bg-green-50 text-green-700 border border-green-100"
                     : "bg-red-50 text-red-700 border border-red-100"
-                }`}
+                  }`}
               >
                 {message}
               </div>

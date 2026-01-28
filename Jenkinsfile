@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = 'github_pat'                  // Jenkins credentials ID
+        DOCKERHUB_CREDENTIALS = 'github_pat'                // Jenkins credentials ID
         DOCKERHUB_USERNAME = 'budhathribandara'             // Docker Hub username
         IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
     }
@@ -31,7 +31,6 @@ pipeline {
                     docker tag health_backend ${DOCKERHUB_USERNAME}/health-backend:latest
                     docker tag health_frontend ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}
                     docker tag health_frontend ${DOCKERHUB_USERNAME}/health-frontend:latest
-                    
                     """
                 }
             }
@@ -51,6 +50,25 @@ pipeline {
                 }
             }
         }
+
+        // --- NEW STAGE START ---
+        stage('Provision Infrastructure') {
+            steps {
+                // This injects the AWS keys (aws-creds) you created as environment variables
+                withCredentials([usernamePassword(credentialsId: 'aws-creds', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                    
+                    dir('terraform') {
+                        // Initialize Terraform
+                        sh 'terraform init'
+                        
+                        // Create the infrastructure (Auto-approve prevents waiting for input)
+                        sh 'terraform apply -auto-approve'
+                    }
+                }
+            }
+        }
+        // --- NEW STAGE END ---
+
         // stage('Run Containers') {
         //     steps {
         //   script {

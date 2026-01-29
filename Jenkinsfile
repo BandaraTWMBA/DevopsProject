@@ -57,14 +57,14 @@ pipeline {
                         usernamePassword(credentialsId: AWS_CREDS_ID, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')
                     ]) {
                         sh '''
-                        # FIX 1: Added -upgrade to fix the version lock error
+                        # --- FIX 1: ADD -upgrade HERE ---
                         terraform init -upgrade
                         
-                        # FIX 2: Removed -var flags (Your main.tf does not use these variables)
+                        # --- FIX 2: REMOVE -var flags (Your main.tf doesn't use them) ---
                         terraform plan
                         terraform apply -auto-approve
                         
-                        # FIX 3: Changed "instance_ip" to "public_ip" to match your main.tf
+                        # --- FIX 3: USE "public_ip" (Matches your main.tf output) ---
                         terraform output -raw public_ip > ../server_ip.txt
                         '''
                     }

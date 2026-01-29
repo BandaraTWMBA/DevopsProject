@@ -20,12 +20,10 @@ pipeline {
         stage('Build Images') {
             steps {
                 script {
-                    // 1. Build Frontend (with the API URL baked in)
-                    // Note: We use a placeholder IP or the variable logic. 
-                    // Ideally, use a domain name, but for now we stick to the build.
+                    // 1. Build Frontend
                     sh "docker build -t $DOCKERHUB_USERNAME/$FRONTEND_IMAGE:latest ./frontend"
                     
-                    // 2. Build Backend (New Step)
+                    // 2. Build Backend
                     sh "docker build -t $DOCKERHUB_USERNAME/$BACKEND_IMAGE:latest ./backend"
                 }
             }
@@ -42,10 +40,7 @@ pipeline {
                         sh '''
                         echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
                         
-                        # Push Frontend
                         docker push $DOCKERHUB_USERNAME/$FRONTEND_IMAGE:latest
-                        
-                        # Push Backend
                         docker push $DOCKERHUB_USERNAME/$BACKEND_IMAGE:latest
                         
                         docker logout
@@ -59,14 +54,18 @@ pipeline {
             steps {
                 dir('terraform') {
                     withCredentials([
-                        usernamePassword(credentialsId: AWS_CREDS_ID, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY'),
-                        usernamePassword(credentialsId: DOCKER_REGISTRY_CRED_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')
+                        usernamePassword(credentialsId: AWS_CREDS_ID, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')
                     ]) {
                         sh '''
-                        terraform init
-                        terraform plan -var="docker_username=$DOCKER_USER" -var="docker_password=$DOCKER_PASS"
-                        terraform apply -auto-approve -var="docker_username=$DOCKER_USER" -var="docker_password=$DOCKER_PASS"
-                        terraform output -raw instance_ip > ../server_ip.txt
+                        # FIX 1: Added -upgrade to fix the version lock error
+                        terraform init -upgrade
+                        
+                        # FIX 2: Removed -var flags (Your main.tf does not use these variables)
+                        terraform plan
+                        terraform apply -auto-approve
+                        
+                        # FIX 3: Changed "instance_ip" to "public_ip" to match your main.tf
+                        terraform output -raw public_ip > ../server_ip.txt
                         '''
                     }
                 }
@@ -82,8 +81,8 @@ pipeline {
                     def SERVER_IP = readFile('server_ip.txt').trim()
                     echo "Deploying to Server at: ${SERVER_IP}"
                     
-                    // Wait for EC2 to be ready
-                    sleep time: 30, unit: 'SECONDS' 
+                    // Wait for EC2 to be fully ready
+                    sleep time: 45, unit: 'SECONDS' 
 
                     sshagent(credentials: ['ec2-ssh-key']) {
                         sh """
@@ -104,11 +103,10 @@ pipeline {
                                 # 4. Start MongoDB
                                 sudo docker run -d --name mongo-db --network app-network -p 27017:27017 mongo:6
 
-                                # 5. Start Backend (Points to Mongo container)
+                                # 5. Start Backend
                                 sudo docker run -d --name health-backend --network app-network -p 5000:5000 -e MONGODB_URI="mongodb://mongo-db:27017/devops" ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:latest
 
-                                # 6. Start Frontend (Points to AWS Public IP)
-                                # IMPORTANT: We inject the IP dynamically here so the browser knows where to look
+                                # 6. Start Frontend (Injecting Public IP)
                                 sudo docker run -d --name health-frontend --network app-network -p 80:5173 -e VITE_API_URL="http://${SERVER_IP}:5000" ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:latest
                             '
                         """

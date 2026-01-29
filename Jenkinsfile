@@ -7,7 +7,7 @@ pipeline {
         BACKEND_IMAGE           = 'health_backend'
         FRONTEND_IMAGE          = 'health_frontend'
         AWS_CREDS_ID            = 'aws-creds'
-        AWS_DEFAULT_REGION      = 'us-east-1c'
+        AWS_DEFAULT_REGION      = 'us-east-1'
     }
 
     stages {

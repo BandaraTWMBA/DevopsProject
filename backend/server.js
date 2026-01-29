@@ -9,7 +9,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/devops_db';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://mongo-db:27017/devops_db';
 // Connect to MongoDB
 mongoose.connect(MONGODB_URI, {
     useNewUrlParser: true,

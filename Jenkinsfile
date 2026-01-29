@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = 'github_pat'
-        DOCKERHUB_USERNAME = 'budhathribandara'
+        DOCKERHUB_CREDENTIALS = 'dockerhub'
+        DOCKERHUB_USERNAME = 'budhathri'
         IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
     }
 

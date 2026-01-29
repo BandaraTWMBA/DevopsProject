@@ -30,7 +30,7 @@ data "aws_ami" "ubuntu" {
 }
 
 resource "aws_security_group" "web_sg" {
-  name        = "devops-project-sg"
+  name        = "devops-project-sg-2"
   description = "Allow HTTP, Backend, and SSH traffic"
 
   ingress {

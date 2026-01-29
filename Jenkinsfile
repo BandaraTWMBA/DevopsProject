@@ -14,14 +14,20 @@ pipeline {
             }
         }
 
-        stage('Build Docker Images') {
+       stage('Build Docker Images') {
             steps {
                 script {
-                    sh "docker-compose build"
+                    // Prune before building to ensure we have space
+                    sh "docker system prune -f" 
+
+                    echo "Building Backend..."
+                    sh "docker build -t health_backend ./backend"
+                    
+                    echo "Building Frontend..."
+                    sh "docker build -t health_frontend ./frontend"
                 }
             }
         }
-
         stage('Tag & Push Images') {
             steps {
                 script {

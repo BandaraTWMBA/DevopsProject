@@ -57,21 +57,17 @@ pipeline {
                         usernamePassword(credentialsId: AWS_CREDS_ID, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')
                     ]) {
                         sh '''
-                        # --- FIX 1: ADD -upgrade HERE ---
                         terraform init -upgrade
-                        
-                        # --- FIX 2: REMOVE -var flags (Your main.tf doesn't use them) ---
                         terraform plan
                         terraform apply -auto-approve
                         
-                        # --- FIX 3: USE "public_ip" (Matches your main.tf output) ---
-                        terraform output -raw public_ip > ../server_ip.txt
+                        # FIX: Changed "public_ip" to "instance_ip" to match your Terraform output
+                        terraform output -raw instance_ip > ../server_ip.txt
                         '''
                     }
                 }
             }
         }
-
         stage('Deploy to EC2') {
             steps {
                 script {

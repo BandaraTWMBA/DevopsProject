@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_REGISTRY_CRED_ID = 'docker-hub-credentials-id'
+        DOCKER_REGISTRY_CRED_ID = 'dockerhub'
         DOCKERHUB_USERNAME      = 'budhathri'
         BACKEND_IMAGE           = 'health_backend'
         FRONTEND_IMAGE          = 'health_frontend'

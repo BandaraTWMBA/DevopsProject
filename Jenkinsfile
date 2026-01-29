@@ -2,9 +2,12 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = 'dockerhub'
-        DOCKERHUB_USERNAME = 'budhathri'
-        IMAGE_TAG = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+        DOCKER_REGISTRY_CRED_ID = 'docker-hub-credentials-id'
+        DOCKERHUB_USERNAME      = 'budhathri'
+        BACKEND_IMAGE           = 'health_backend'
+        FRONTEND_IMAGE          = 'health_frontend'
+        AWS_CREDS_ID            = 'aws-creds'
+        AWS_DEFAULT_REGION      = 'us-east-1c'
     }
 
     stages {
@@ -14,56 +17,101 @@ pipeline {
             }
         }
 
-       stage('Build Docker Images') {
+        stage('Build Images') {
             steps {
                 script {
-                    // Prune before building to ensure we have space
-                    sh "docker system prune -f" 
-
-                    echo "Building Backend..."
-                    sh "docker build -t health_backend ./backend"
+                    // 1. Build Frontend (with the API URL baked in)
+                    // Note: We use a placeholder IP or the variable logic. 
+                    // Ideally, use a domain name, but for now we stick to the build.
+                    sh "docker build -t $DOCKERHUB_USERNAME/$FRONTEND_IMAGE:latest ./frontend"
                     
-                    echo "Building Frontend..."
-                    sh "docker build -t health_frontend ./frontend"
+                    // 2. Build Backend (New Step)
+                    sh "docker build -t $DOCKERHUB_USERNAME/$BACKEND_IMAGE:latest ./backend"
                 }
             }
         }
-        stage('Tag & Push Images') {
+
+        stage('Push Images to Docker Hub') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', DOCKERHUB_CREDENTIALS) {
-                        // Tag and Push Backend
-                        sh "docker tag health_backend ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG}"
-                        sh "docker tag health_backend ${DOCKERHUB_USERNAME}/health-backend:latest"
-                        sh "docker push ${DOCKERHUB_USERNAME}/health-backend:${IMAGE_TAG}"
-                        sh "docker push ${DOCKERHUB_USERNAME}/health-backend:latest"
-
-                        // Tag and Push Frontend
-                        sh "docker tag health_frontend ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}"
-                        sh "docker tag health_frontend ${DOCKERHUB_USERNAME}/health-frontend:latest"
-                        sh "docker push ${DOCKERHUB_USERNAME}/health-frontend:${IMAGE_TAG}"
-                        sh "docker push ${DOCKERHUB_USERNAME}/health-frontend:latest"
+                    withCredentials([usernamePassword(
+                        credentialsId: DOCKER_REGISTRY_CRED_ID,
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        sh '''
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        
+                        # Push Frontend
+                        docker push $DOCKERHUB_USERNAME/$FRONTEND_IMAGE:latest
+                        
+                        # Push Backend
+                        docker push $DOCKERHUB_USERNAME/$BACKEND_IMAGE:latest
+                        
+                        docker logout
+                        '''
                     }
                 }
             }
         }
 
-        stage('Deploy to AWS') {
+        stage('Provision Infrastructure') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'aws-creds', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    dir('terraform') {
-                        // 1. Initialize Terraform
-                        sh 'terraform init'
+                dir('terraform') {
+                    withCredentials([
+                        usernamePassword(credentialsId: AWS_CREDS_ID, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY'),
+                        usernamePassword(credentialsId: DOCKER_REGISTRY_CRED_ID, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')
+                    ]) {
+                        sh '''
+                        terraform init
+                        terraform plan -var="docker_username=$DOCKER_USER" -var="docker_password=$DOCKER_PASS"
+                        terraform apply -auto-approve -var="docker_username=$DOCKER_USER" -var="docker_password=$DOCKER_PASS"
+                        terraform output -raw instance_ip > ../server_ip.txt
+                        '''
+                    }
+                }
+            }
+        }
 
-                        // 2. FORCE REPLACEMENT: This ensures you get a fresh server with the NEW code every time.
-                        // If we don't do this, Terraform might say "No changes" and keep the old app running.
-                        sh 'terraform taint aws_instance.app_server || true'
+        stage('Deploy to EC2') {
+            steps {
+                script {
+                    if (!fileExists('server_ip.txt')) {
+                        error "server_ip.txt was not found."
+                    }
+                    def SERVER_IP = readFile('server_ip.txt').trim()
+                    echo "Deploying to Server at: ${SERVER_IP}"
+                    
+                    // Wait for EC2 to be ready
+                    sleep time: 30, unit: 'SECONDS' 
 
-                        // 3. Apply Changes (Create Server)
-                        sh 'terraform apply -auto-approve'
-                        
-                        // 4. Save the IP address to a file so we can see it
-                        sh 'terraform output -raw public_ip > deploy_ip.txt'
+                    sshagent(credentials: ['ec2-ssh-key']) {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no ubuntu@${SERVER_IP} '
+                                # 1. Pull Latest Images
+                                sudo docker pull mongo:6
+                                sudo docker pull ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:latest
+                                sudo docker pull ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:latest
+
+                                # 2. Cleanup Old Containers & Network
+                                sudo docker stop health-frontend health-backend mongo-db || true
+                                sudo docker rm health-frontend health-backend mongo-db || true
+                                sudo docker network rm app-network || true
+
+                                # 3. Create Network
+                                sudo docker network create app-network
+
+                                # 4. Start MongoDB
+                                sudo docker run -d --name mongo-db --network app-network -p 27017:27017 mongo:6
+
+                                # 5. Start Backend (Points to Mongo container)
+                                sudo docker run -d --name health-backend --network app-network -p 5000:5000 -e MONGODB_URI="mongodb://mongo-db:27017/devops" ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:latest
+
+                                # 6. Start Frontend (Points to AWS Public IP)
+                                # IMPORTANT: We inject the IP dynamically here so the browser knows where to look
+                                sudo docker run -d --name health-frontend --network app-network -p 80:5173 -e VITE_API_URL="http://${SERVER_IP}:5000" ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:latest
+                            '
+                        """
                     }
                 }
             }
@@ -71,19 +119,8 @@ pipeline {
     }
 
     post {
-        success {
-            script {
-                // Read the IP address we saved
-                def server_ip = readFile('terraform/deploy_ip.txt').trim()
-                
-                echo "✅ Deployment Successful!"
-                echo "--------------------------------------------------"
-                echo "🌐 YOUR APP IS LIVE AT: http://${server_ip}:5173"
-                echo "--------------------------------------------------"
-            }
-        }
-        failure {
-            echo "❌ Deployment Failed. Check the logs above."
+        always {
+            sh 'docker logout || true'
         }
     }
 }

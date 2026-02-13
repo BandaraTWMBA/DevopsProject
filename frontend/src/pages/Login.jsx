@@ -19,7 +19,7 @@ export default function Login() {
     setMessage("");
 
     try {
-      const res = await axios.post("http://34.235.116.10:5000/login", form);
+      const res = await axios.post("http://100.27.207.74:5000/login", form);
 
       if (res.data?.user) localStorage.setItem("user", JSON.stringify(res.data.user));
       if (res.data?.token) localStorage.setItem("token", res.data.token);

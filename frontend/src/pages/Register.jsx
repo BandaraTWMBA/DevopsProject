@@ -16,7 +16,7 @@ export default function Register() {
     setMessage("");
 
     try {
-      const res = await axios.post("http://34.235.116.10:5000/register", {
+      const res = await axios.post("http://100.27.207.74:5000/register", {
         firstname: form.firstname,
         email: form.email,
         password: form.password

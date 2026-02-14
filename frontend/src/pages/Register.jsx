@@ -85,7 +85,7 @@ export default function Register() {
                   </svg>
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-800">Create Account</h1>
+                  <h1 className="text-2xl font-bold text-gray-800">Budhathri</h1>
                   <p className="text-sm text-gray-500">Sign up to get started</p>
                 </div>
               </div>

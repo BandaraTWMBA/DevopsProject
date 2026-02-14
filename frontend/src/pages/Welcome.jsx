@@ -10,7 +10,7 @@ export default function Welcome() {
             {/* Header */}
             <h1 className="text-xl text-gray-800 mb-2">Welcome to</h1>
             <h2 className="text-4xl font-bold text-blue-600 mb-10 tracking-tight">
-                myfitnesspal<span className="text-xs align-top">®</span>
+                Healthcare<span className="text-xs align-top">®</span>
             </h2>
 
             {/* Cards Container */}
